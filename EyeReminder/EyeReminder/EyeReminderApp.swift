@@ -63,15 +63,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Observe reminder state changes
         appState.$showingReminder
             .sink { [weak self] showingReminder in
-                if showingReminder {
-                    self?.showReminderOverlay(appState: appState, multiReminderManager: multiReminderManager)
-                } else {
-                    self?.hideReminderOverlay()
+                Task { @MainActor in
+                    if showingReminder {
+                        self?.showReminderOverlay(appState: appState, multiReminderManager: multiReminderManager)
+                    } else {
+                        self?.hideReminderOverlay()
+                    }
                 }
             }
             .store(in: &cancellables)
     }
     
+    @MainActor
     func showReminderOverlay(appState: AppState, multiReminderManager: MultiReminderManager) {
         // Close existing overlay if any
         hideReminderOverlay()
@@ -86,6 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    @MainActor
     func hideReminderOverlay() {
         guard let window = overlayWindowController?.window else { return }
         
