@@ -49,10 +49,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var timerManager: TimerManager?
     var multiReminderManager: MultiReminderManager?
     private var cancellables = Set<AnyCancellable>()
+    private var wasRunningBeforeSleep: Bool = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon for menu bar app
         NSApp.setActivationPolicy(.accessory)
+        
+        // Setup sleep/wake observers
+        setupSleepWakeObservers()
+    }
+    
+    private func setupSleepWakeObservers() {
+        // Observe when Mac is going to sleep
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(systemWillSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        
+        // Observe when Mac wakes up
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func systemWillSleep() {
+        Task { @MainActor in
+            guard let multiReminderManager = multiReminderManager else { return }
+            
+            // Remember if timers were running before sleep
+            wasRunningBeforeSleep = multiReminderManager.isRunning
+            
+            // Pause timers if they're running
+            if wasRunningBeforeSleep {
+                print("Mac going to sleep - pausing timers")
+                multiReminderManager.pause()
+            }
+        }
+    }
+    
+    @objc private func systemDidWake() {
+        Task { @MainActor in
+            guard let multiReminderManager = multiReminderManager else { return }
+            
+            // Resume timers if they were running before sleep
+            if wasRunningBeforeSleep {
+                print("Mac woke up - resuming timers")
+                multiReminderManager.start()
+                wasRunningBeforeSleep = false
+            }
+        }
+    }
+    
+    deinit {
+        // Remove observers when deallocating
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
     
     @MainActor
