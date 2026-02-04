@@ -8,6 +8,33 @@
 import Foundation
 import SwiftUI
 
+enum DisplayStyle: String, Codable, CaseIterable, Identifiable {
+    case modern = "Modern"
+    case minimal = "Minimal"
+    case bold = "Bold"
+    
+    var id: String { rawValue }
+    
+    var description: String {
+        switch self {
+        case .modern:
+            return "Soft gradients with gentle glow effects - easy on the eyes during long work sessions"
+        case .minimal:
+            return "Warm, clean design with reduced brightness - perfect for focused work"
+        case .bold:
+            return "Rich colors with comfortable saturation - attention-grabbing yet eye-friendly"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .modern: return "sparkles"
+        case .minimal: return "minus.circle"
+        case .bold: return "bolt.fill"
+        }
+    }
+}
+
 enum ReminderType: String, Codable, CaseIterable, Identifiable {
     case eyes = "Eyes"
     case water = "Water"
@@ -67,23 +94,26 @@ enum ReminderType: String, Codable, CaseIterable, Identifiable {
 struct ReminderSettings: Codable {
     var enabled: Bool
     var intervalMinutes: Int
-    var durationSeconds: Int = 20
+    var durationSeconds: Int
     
-    init(enabled: Bool = true, intervalMinutes: Int = 20) {
+    init(enabled: Bool = true, intervalMinutes: Int = 20, durationSeconds: Int = 20) {
         self.enabled = enabled
         self.intervalMinutes = intervalMinutes
+        self.durationSeconds = durationSeconds
     }
 }
 
 struct AppSettings: Codable {
-    var eyesReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 20)
-    var waterReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 30)
-    var standupReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 45)
+    var eyesReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 20, durationSeconds: 20)
+    var waterReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 30, durationSeconds: 15)
+    var standupReminder: ReminderSettings = ReminderSettings(enabled: true, intervalMinutes: 45, durationSeconds: 25)
     var launchAtLogin: Bool = false
+    var displayStyle: DisplayStyle = .modern
+    var forceFocusMode: Bool = false
     
     private static let userDefaultsKey = "HealthReminderSettings"
     
-    // Legacy support
+    // Legacy support for backward compatibility
     var reminderIntervalMinutes: Int {
         get { eyesReminder.intervalMinutes }
         set { eyesReminder.intervalMinutes = newValue }

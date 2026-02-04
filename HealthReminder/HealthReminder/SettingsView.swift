@@ -68,7 +68,10 @@ struct SettingsView: View {
                 case .appearance:
                     AppearanceSettingsView(
                         soundEnabled: $soundEnabled,
-                        showNotification: $showNotification
+                        showNotification: $showNotification,
+                        appState: appState,
+                        timerManager: timerManager,
+                        durationSeconds: durationSeconds
                     )
                 case .advanced:
                     AdvancedSettingsView()
@@ -132,45 +135,224 @@ struct GeneralSettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var timerManager: TimerManager
     
+    @State private var eyesDuration: Double
+    @State private var waterDuration: Double
+    @State private var standupDuration: Double
+    @State private var forceFocusMode: Bool
+    
+    init(durationSeconds: Binding<Double>, launchAtLogin: Binding<Bool>, appState: AppState, timerManager: TimerManager) {
+        self._durationSeconds = durationSeconds
+        self._launchAtLogin = launchAtLogin
+        self.appState = appState
+        self.timerManager = timerManager
+        self._eyesDuration = State(initialValue: Double(appState.settings.eyesReminder.durationSeconds))
+        self._waterDuration = State(initialValue: Double(appState.settings.waterReminder.durationSeconds))
+        self._standupDuration = State(initialValue: Double(appState.settings.standupReminder.durationSeconds))
+        self._forceFocusMode = State(initialValue: appState.settings.forceFocusMode)
+    }
+    
     var body: some View {
         Form {
-            // Display Duration Section
+            // Individual Display Duration Section
             Section {
-                LabeledContent {
-                    HStack(spacing: 12) {
-                        Text("\(Int(durationSeconds))")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.blue)
-                            .monospacedDigit()
+                // Eyes Duration
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Eyes Reminder", systemImage: "eye.fill")
+                            .font(.system(size: 13))
+                            .symbolRenderingMode(.multicolor)
                         
-                        Text("sec")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            Text("\(Int(eyesDuration))")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.cyan)
+                                .monospacedDigit()
+                            Text("sec")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
                     }
-                } label: {
-                    Label("Display Duration", systemImage: "timer")
-                        .font(.system(size: 13))
+                    
+                    Slider(value: $eyesDuration, in: 10...120, step: 5)
+                        .tint(.cyan)
+                        .controlSize(.small)
+                        .onChange(of: eyesDuration) { _ in
+                            saveSettings()
+                        }
                 }
+                .padding(.vertical, 4)
                 
-                Slider(value: $durationSeconds, in: 10...120, step: 5) {
-                    Text("Duration")
-                } minimumValueLabel: {
-                    Text("10")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                } maximumValueLabel: {
-                    Text("120")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                Divider()
+                
+                // Water Duration
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Water Reminder", systemImage: "drop.fill")
+                            .font(.system(size: 13))
+                            .symbolRenderingMode(.multicolor)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            Text("\(Int(waterDuration))")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.blue)
+                                .monospacedDigit()
+                            Text("sec")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Slider(value: $waterDuration, in: 10...120, step: 5)
+                        .tint(.blue)
+                        .controlSize(.small)
+                        .onChange(of: waterDuration) { _ in
+                            saveSettings()
+                        }
                 }
-                .controlSize(.small)
+                .padding(.vertical, 4)
                 
+                Divider()
+                
+                // Stand Up Duration
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Stand Up Reminder", systemImage: "figure.stand")
+                            .font(.system(size: 13))
+                            .symbolRenderingMode(.multicolor)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            Text("\(Int(standupDuration))")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.green)
+                                .monospacedDigit()
+                            Text("sec")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Slider(value: $standupDuration, in: 10...120, step: 5)
+                        .tint(.green)
+                        .controlSize(.small)
+                        .onChange(of: standupDuration) { _ in
+                            saveSettings()
+                        }
+                }
+                .padding(.vertical, 4)
+                
+            } header: {
+                Text("Display Duration")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
             } footer: {
-                Text("How long reminder screens will be displayed before auto-closing.")
+                Text("How long each reminder type will be displayed before auto-closing.")
                     .font(.system(size: 11))
             }
             
-            // Test Reminders Section
+            // Focus Mode Section
+            Section {
+                LabeledContent {
+                    Toggle("", isOn: $forceFocusMode)
+                        .labelsHidden()
+                        .onChange(of: forceFocusMode) { _ in
+                            saveSettings()
+                        }
+                } label: {
+                    Label("Force Focus Mode", systemImage: "lock.fill")
+                        .font(.system(size: 13))
+                }
+            } header: {
+                Text("Focus Mode")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+            } footer: {
+                Text("When enabled, you must wait for the entire countdown before closing reminders. Skip button will be disabled.")
+                    .font(.system(size: 11))
+            }
+            
+            // Startup Section
+            Section {
+                LabeledContent {
+                    Toggle("", isOn: $launchAtLogin)
+                        .labelsHidden()
+                } label: {
+                    Label("Launch at Login", systemImage: "power.circle")
+                        .font(.system(size: 13))
+                }
+            } footer: {
+                Text("Automatically start Health Reminder when you log in to your Mac.")
+                    .font(.system(size: 11))
+            }
+        }
+        .formStyle(.grouped)
+    }
+    
+    private func saveSettings() {
+        var newSettings = appState.settings
+        newSettings.eyesReminder.durationSeconds = Int(eyesDuration)
+        newSettings.waterReminder.durationSeconds = Int(waterDuration)
+        newSettings.standupReminder.durationSeconds = Int(standupDuration)
+        newSettings.forceFocusMode = forceFocusMode
+        appState.updateSettings(newSettings)
+    }
+}
+
+// MARK: - Appearance Settings View
+struct AppearanceSettingsView: View {
+    @Binding var soundEnabled: Bool
+    @Binding var showNotification: Bool
+    @ObservedObject var appState: AppState
+    @ObservedObject var timerManager: TimerManager
+    let durationSeconds: Double
+    @State private var selectedStyle: DisplayStyle
+    
+    init(soundEnabled: Binding<Bool>, showNotification: Binding<Bool>, appState: AppState, timerManager: TimerManager, durationSeconds: Double) {
+        self._soundEnabled = soundEnabled
+        self._showNotification = showNotification
+        self.appState = appState
+        self.timerManager = timerManager
+        self.durationSeconds = durationSeconds
+        self._selectedStyle = State(initialValue: appState.settings.displayStyle)
+    }
+    
+    var body: some View {
+        Form {
+            // Display Style Section
+            Section {
+                VStack(spacing: 16) {
+                    ForEach(DisplayStyle.allCases) { style in
+                        StyleOptionCard(
+                            style: style,
+                            isSelected: selectedStyle == style,
+                            onSelect: {
+                                selectedStyle = style
+                                var newSettings = appState.settings
+                                newSettings.displayStyle = style
+                                appState.updateSettings(newSettings)
+                            }
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
+            } header: {
+                Text("Reminder Display Style")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+            } footer: {
+                Text("Choose how reminder screens will appear. Use the preview button below to test each style.")
+                    .font(.system(size: 11))
+            }
+            
+            // Preview Section
             Section {
                 LabeledContent {
                     Menu {
@@ -195,7 +377,7 @@ struct GeneralSettingsView: View {
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                 } label: {
-                    Label("Test Reminder", systemImage: "play.circle")
+                    Label("Test Display Style", systemImage: "play.circle")
                         .font(.system(size: 13))
                 }
             } header: {
@@ -204,53 +386,11 @@ struct GeneralSettingsView: View {
                     .foregroundColor(.secondary)
                     .textCase(.uppercase)
             } footer: {
-                Text("Preview how different reminder types will appear on your screen.")
+                Text("Preview how reminders will appear with your selected display style.")
                     .font(.system(size: 11))
             }
             
-            // Startup Section
-            Section {
-                LabeledContent {
-                    Toggle("", isOn: $launchAtLogin)
-                        .labelsHidden()
-                } label: {
-                    Label("Launch at Login", systemImage: "power.circle")
-                        .font(.system(size: 13))
-                }
-            } footer: {
-                Text("Automatically start Health Reminder when you log in to your Mac.")
-                    .font(.system(size: 11))
-            }
-        }
-        .formStyle(.grouped)
-    }
-    
-    private func showPreview(type: ReminderType) {
-        // Temporarily update settings for preview
-        let currentSettings = appState.settings
-        var previewSettings = currentSettings
-        previewSettings.reminderDurationSeconds = Int(durationSeconds)
-        
-        // Update settings temporarily
-        appState.settings = previewSettings
-        
-        // Trigger the specific reminder type
-        appState.showReminder(type: type)
-        
-        // Restore original settings after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            appState.settings = currentSettings
-        }
-    }
-}
-
-// MARK: - Appearance Settings View
-struct AppearanceSettingsView: View {
-    @Binding var soundEnabled: Bool
-    @Binding var showNotification: Bool
-    
-    var body: some View {
-        Form {
+            // Alerts Section
             Section {
                 LabeledContent {
                     Toggle("", isOn: $soundEnabled)
@@ -276,34 +416,92 @@ struct AppearanceSettingsView: View {
                 Text("Play sound and show notifications when reminders appear.")
                     .font(.system(size: 11))
             }
-            
-            Section {
-                GroupBox {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.blue.gradient)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Gentle Overlay Design")
-                                .font(.system(size: 13, weight: .medium))
-                            
-                            Text("Semi-transparent design with smooth animations to minimize eye strain and provide a calming experience.")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(8)
-                }
-            } header: {
-                Text("Display Style")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .textCase(.uppercase)
-            }
         }
         .formStyle(.grouped)
+    }
+    
+    private func showPreview(type: ReminderType) {
+        // Temporarily update settings for preview
+        let currentSettings = appState.settings
+        var previewSettings = currentSettings
+        previewSettings.reminderDurationSeconds = Int(durationSeconds)
+        
+        // Update settings temporarily
+        appState.settings = previewSettings
+        
+        // Trigger the specific reminder type
+        appState.showReminder(type: type)
+        
+        // Restore original settings after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            appState.settings = currentSettings
+        }
+    }
+}
+
+// MARK: - Style Option Card
+struct StyleOptionCard: View {
+    let style: DisplayStyle
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 16) {
+                // Style icon with background
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? style.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
+                        .frame(width: 44, height: 44)
+                    
+                    Image(systemName: style.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(isSelected ? style.accentColor : .gray)
+                }
+                
+                // Style info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(style.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    Text(style.description)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                Spacer()
+                
+                // Selection indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(style.accentColor)
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(NSColor.controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? style.accentColor : Color.clear, lineWidth: 2)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - DisplayStyle Extension for UI
+extension DisplayStyle {
+    var accentColor: Color {
+        switch self {
+        case .modern: return .blue
+        case .minimal: return .gray
+        case .bold: return .orange
+        }
     }
 }
 
