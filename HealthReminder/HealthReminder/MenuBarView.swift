@@ -176,7 +176,7 @@ struct MenuBarView: View {
                 Divider()
                 
                 Button(action: {
-                    openSettingsWindow()
+                    openSettings()
                 }) {
                     HStack {
                         Image(systemName: "gearshape")
@@ -223,44 +223,57 @@ struct MenuBarView: View {
         .frame(width: 280)
     }
     
-    private func openSettingsWindow() {
-        // Close the menu bar popover first
-        closeMenuBarPopover()
+    private func openSettings() {
+        // Close menu bar dropdown first
+        closeMenuBarMenu()
         
-        // Small delay to ensure popover closes before opening settings
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Try to find existing Settings window first
-            if let existingWindow = NSApp.windows.first(where: { $0.title == "Settings" }) {
+        // Try to find existing Settings window first
+        if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "SettingsWindow" }) {
+            // Show dock icon
+            NSApp.setActivationPolicy(.regular)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 NSApp.activate(ignoringOtherApps: true)
                 existingWindow.makeKeyAndOrderFront(nil)
-            } else {
-                // Create new settings window
-                let settingsView = SettingsView(appState: appState, timerManager: timerManager)
-                    .environmentObject(updateChecker)
-                let hostingController = NSHostingController(rootView: settingsView)
-                
-                let window = NSWindow(contentViewController: hostingController)
-                window.title = "Settings"
-                window.styleMask = [.titled, .closable]
-                window.setContentSize(NSSize(width: 700, height: 500))
-                window.center()
-                window.isReleasedWhenClosed = false
-                window.titlebarAppearsTransparent = false
-                window.backgroundColor = NSColor.windowBackgroundColor
-                
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeKeyAndOrderFront(nil)
-                
-                // Store reference to keep window alive
-                SettingsWindowManager.shared.settingsWindow = window
             }
+            return
+        }
+        
+        // Create new settings window
+        let settingsView = SettingsView(appState: appState, timerManager: timerManager)
+            .environmentObject(updateChecker)
+        let hostingController = NSHostingController(rootView: settingsView)
+        
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Settings"
+        window.identifier = NSUserInterfaceItemIdentifier("SettingsWindow")
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.setContentSize(NSSize(width: 700, height: 500))
+        window.center()
+        window.isReleasedWhenClosed = false
+        
+        // Setup window delegate to manage dock icon
+        let delegate = SettingsWindowDelegate()
+        window.delegate = delegate
+        
+        // Store reference
+        SettingsWindowManager.shared.settingsWindow = window
+        SettingsWindowManager.shared.windowDelegate = delegate
+        
+        // Show dock icon FIRST
+        NSApp.setActivationPolicy(.regular)
+        
+        // Small delay to ensure activation policy takes effect
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
         }
     }
     
-    private func closeMenuBarPopover() {
-        // Find and close the menu bar popover window
+    /// Đóng menu bar dropdown (popup) khi nhấn Settings
+    private func closeMenuBarMenu() {
         for window in NSApp.windows {
             if window.level == .popUpMenu {
+                window.orderOut(nil)
                 window.close()
                 break
             }
@@ -315,6 +328,25 @@ struct TimerStatusRow: View {
 class SettingsWindowManager {
     static let shared = SettingsWindowManager()
     var settingsWindow: NSWindow?
+    var windowDelegate: SettingsWindowDelegate?
     
     private init() {}
+}
+
+// Window delegate to handle Settings window close event
+class SettingsWindowDelegate: NSObject, NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        print("Settings window closing - hiding dock icon")
+        // Hide dock icon when Settings window closes
+        NSApp.setActivationPolicy(.accessory)
+        // Clean up reference
+        SettingsWindowManager.shared.settingsWindow = nil
+        SettingsWindowManager.shared.windowDelegate = nil
+    }
+    
+    func windowDidBecomeKey(_ notification: Notification) {
+        print("Settings window became key - ensuring dock icon visible")
+        // Ensure dock icon is visible when window becomes key
+        NSApp.setActivationPolicy(.regular)
+    }
 }
