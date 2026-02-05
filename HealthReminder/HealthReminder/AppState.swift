@@ -16,6 +16,8 @@ class AppState: ObservableObject {
     @Published var showingSettings: Bool = false
     @Published var showingReminder: Bool = false
     @Published var currentReminderType: ReminderType = .eyes
+    /// True when reminder is shown from Settings preview (cho phép hiển thị overlay dù timer chưa chạy)
+    @Published var isPreviewMode: Bool = false
     
     static let shared = AppState()
     
@@ -32,8 +34,9 @@ class AppState: ObservableObject {
         newSettings.save()
     }
     
-    func showReminder(type: ReminderType) {
+    func showReminder(type: ReminderType, preview: Bool = false) {
         currentReminderType = type
+        isPreviewMode = preview
         showingReminder = true
     }
 }

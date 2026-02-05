@@ -429,8 +429,8 @@ struct AppearanceSettingsView: View {
         // Update settings temporarily
         appState.settings = previewSettings
         
-        // Trigger the specific reminder type
-        appState.showReminder(type: type)
+        // Trigger preview (preview: true = hiển thị overlay dù timer chưa Start)
+        appState.showReminder(type: type, preview: true)
         
         // Restore original settings after a delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

@@ -124,8 +124,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.$showingReminder
             .sink { [weak self] showingReminder in
                 Task { @MainActor in
-                    // Only show reminder if manager is actually running
-                    if showingReminder && multiReminderManager.isRunning {
+                    // Show overlay when: timer đang chạy HOẶC đang preview từ Settings
+                    let shouldShow = showingReminder && (multiReminderManager.isRunning || appState.isPreviewMode)
+                    if shouldShow {
                         self?.showReminderOverlay(appState: appState, multiReminderManager: multiReminderManager)
                     } else if !showingReminder {
                         self?.hideReminderOverlay()
@@ -153,6 +154,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func hideReminderOverlay() {
         guard let window = overlayWindowController?.window else { return }
+        
+        // Clear preview mode when overlay closes
+        appState?.isPreviewMode = false
         
         // Reset window level to normal before closing
         window.level = .normal
